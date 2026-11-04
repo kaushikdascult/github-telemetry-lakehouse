@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: fct_global_developer_activity
+    description: "Gold mart layer: Global developer activity with regional timestamps and burnout flags"
+    columns:
+      - name: event_id
+        description: "Primary key linked to staging"
+        tests:
+          - unique
+          - not_null
+      - name: event_date
+        description: "Partitioning date key"
+        tests:
+          - not_null
+      - name: is_midnight_oil_pushed
+        description: "Boolean flag marking events committed between 22:00 and 05:00 local time"
+        tests:
+          - not_null

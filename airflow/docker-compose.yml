@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  airflow-webserver:
+    image: apache/airflow:2.10.3-python3.11
+    container_name: gh_telemetry_airflow
+    restart: always
+    ports:
+      - "8085:8080"
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/.config/gcloud/application_default_credentials.json
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ../ingestion:/opt/airflow/ingestion
+      - ../dbt:/opt/airflow/dbt
+      - ${HOME}/.config/gcloud:/opt/airflow/.config/gcloud:ro
+    command: >
+      bash -c "pip install dbt-bigquery google-cloud-bigquery requests &&
+               airflow db init &&
+               airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin &&
+               airflow webserver & airflow scheduler"

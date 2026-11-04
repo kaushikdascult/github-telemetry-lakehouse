@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: github_bronze
+    database: kd-bq-sandbox-2026
+    schema: github_bronze
+    tables:
+      - name: raw_events
+        description: "Raw ingested GitHub events partitioned by daily ingestion timestamp"
+        columns:
+          - name: event_id
+            description: "Primary identifier from GitHub API"
+            tests:
+              - not_null
+          - name: event_type
+            description: "GitHub event type classification (PushEvent, WatchEvent, etc.)"
+          - name: raw_payload
+            description: "Full unstructured JSON string payload"
+          - name: ingested_at
+            description: "Pipeline ingestion timestamp in UTC"
+            tests:
+              - not_null

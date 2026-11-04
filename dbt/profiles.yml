@@ -1,0 +1,11 @@
+github_telemetry:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: kd-bq-sandbox-2026
+      dataset: github_silver
+      threads: 4
+      timeout_seconds: 300
+      location: US
