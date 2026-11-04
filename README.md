@@ -3,6 +3,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org)
 [![dbt Core](https://img.shields.io/badge/dbt--core-1.11-FF694B?style=flat&logo=dbt&logoColor=white)](https://www.getdbt.com)
 [![BigQuery](https://img.shields.io/badge/BigQuery-Sandbox-4285F4?style=flat&logo=googlebigquery&logoColor=white)](https://cloud.google.com/bigquery)
+[![GitHub Actions](https://github.com/kaushikdascult/github-telemetry-lakehouse/actions/workflows/pipeline.yml/badge.svg)](https://github.com/kaushikdascult/github-telemetry-lakehouse/actions/workflows/pipeline.yml)
 [![Apache Airflow](https://img.shields.io/badge/Airflow-2.10-017CEE?style=flat&logo=apacheairflow&logoColor=white)](https://airflow.apache.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
