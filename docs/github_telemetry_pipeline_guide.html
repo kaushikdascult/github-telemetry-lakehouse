@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GitHub Telemetry Lakehouse — A Brick-by-Brick Guide</title>
+<style>
+@page { size: A4; margin: 13mm 15mm 13mm; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font: 9pt/1.58 Arial, Helvetica, sans-serif; color: #263445; background: #fff; }
+.page { position: relative; min-height: 270mm; page-break-after: always; padding-bottom: 10mm; }
+.page:last-child { page-break-after: auto; }
+.topline { border-bottom: 1px solid #cbd5df; padding-bottom: 7px; margin-bottom: 12px; }
+.kicker { color: #536b85; text-transform: uppercase; letter-spacing: .11em; font-size: 7pt; font-weight: bold; }
+h1 { color: #172b43; font-size: 23pt; line-height: 1.15; margin: 9px 0 6px; letter-spacing: -.03em; }
+.subtitle { color: #536579; font-size: 10pt; max-width: 160mm; }
+h2 { font-size: 14pt; line-height: 1.2; color: #172b43; margin: 19px 0 9px; }
+h3 { font-size: 10pt; color: #263f5c; margin: 13px 0 6px; }
+p { margin: 5px 0 10px; }
+.lead { font-size: 10pt; color: #40536a; }
+.rule { height: 1px; background: #d9e1e9; margin: 10px 0; }
+.tag { display: inline-block; color: #365b7d; background: #edf3f8; border: 1px solid #d3e0eb; border-radius: 3px; padding: 2px 6px; font-size: 7pt; font-weight: bold; letter-spacing: .04em; }
+.flow { display: flex; align-items: stretch; gap: 6px; margin: 18px 0; }
+.node { flex: 1; border: 1px solid #b9c8d5; border-radius: 4px; padding: 10px 8px; min-height: 64px; background: #fbfcfd; text-align: center; }
+.node strong { display: block; color: #203954; font-size: 8.5pt; margin-bottom: 3px; }
+.node span { display: block; color: #5b6c7c; font-size: 7.2pt; }
+.arrow { align-self: center; color: #8194a6; font-size: 13pt; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 7px 0; }
+.card { border: 1px solid #d5dee6; border-radius: 4px; padding: 11px 12px; background: #fff; }
+.card.blue { background: #f4f8fb; border-color: #cbdce9; }
+.card.green { background: #f4f8f6; border-color: #ccddd5; }
+.card.amber { background: #fbf8f1; border-color: #e8ddc7; }
+.card h3 { margin-top: 0; }
+.card p:last-child { margin-bottom: 0; }
+.def { display: grid; grid-template-columns: 28mm 1fr; gap: 8px; border-bottom: 1px solid #e6ebf0; padding: 8px 0; }
+.def b { color: #244462; }
+.code { white-space: pre-wrap; overflow-wrap: anywhere; background: #f4f6f8; border: 1px solid #d9e0e6; border-radius: 4px; padding: 11px 13px; margin: 9px 0 12px; color: #24374b; font: 7.4pt/1.5 'DejaVu Sans Mono', Consolas, monospace; }
+.json { background: #f5f7fa; border-left: 2px solid #7893aa; }
+.tree { font: 8pt/1.52 'DejaVu Sans Mono', Consolas, monospace; color: #314960; }
+table { width: 100%; border-collapse: collapse; margin: 10px 0 13px; font-size: 8pt; }
+th { background: #edf2f6; color: #203954; font-weight: bold; text-align: left; }
+th, td { border: 1px solid #d8e0e7; padding: 8px 8px; vertical-align: top; }
+tr:nth-child(even) td { background: #fafbfc; }
+.callout { border-left: 2px solid #a77b3d; background: #fbf8f1; padding: 9px 11px; margin: 12px 0; color: #53472f; }
+.good { border-left-color: #517a69; background: #f3f8f5; color: #385647; }
+.steps { counter-reset: step; list-style: none; padding: 0; margin: 5px 0; }
+.steps li { counter-increment: step; position: relative; padding: 6px 0 7px 27px; border-bottom: 1px solid #e9edf1; }
+.steps li::before { content: counter(step); position: absolute; left: 0; top: 4px; border: 1px solid #b8c8d6; color: #31516e; border-radius: 50%; width: 17px; height: 17px; text-align: center; line-height: 16px; font-size: 7pt; font-weight: bold; }
+.small { font-size: 7.6pt; color: #607184; }
+.footer { position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid #d5dde5; padding-top: 5px; color: #8090a0; font-size: 7pt; display: flex; justify-content: space-between; }
+.page-no::after { counter-increment: page; content: counter(page); }
+@media screen { body { background: #e9edf1; } .page { width: 210mm; min-height: 297mm; margin: 12px auto; padding: 13mm 15mm; background: white; box-shadow: 0 2px 12px #cbd2d9; } }
+@media print { .page { min-height: 270mm; } }
+</style>
+</head>
+<body>
+
+<section class="page">
+  <div class="topline"><span class="kicker">A practical data engineering guide · companion to the ingestion guide</span></div>
+  <h1>GitHub Telemetry Lakehouse</h1>
+  <p class="subtitle">How one public GitHub event travels from an API response into BigQuery, through dbt, and into an analytics table — explained one brick at a time.</p>
+  <div class="rule"></div>
+  <p class="lead">This project is a small data pipeline. It asks GitHub for recent public activity, reshapes each event into a row, saves those rows in BigQuery, and prepares easier-to-query tables with dbt.</p>
+  <div class="flow">
+    <div class="node"><strong>1 · GitHub</strong><span>Recent public events</span></div><div class="arrow">→</div>
+    <div class="node"><strong>2 · Python</strong><span>Request, parse, package</span></div><div class="arrow">→</div>
+    <div class="node"><strong>3 · Bronze</strong><span>Raw event envelope</span></div><div class="arrow">→</div>
+    <div class="node"><strong>4 · dbt</strong><span>Extract and shape</span></div><div class="arrow">→</div>
+    <div class="node"><strong>5 · Gold</strong><span>Analytics-ready rows</span></div>
+  </div>
+  <h2>First, the vocabulary</h2>
+  <div class="def"><b>Data source</b><span>The system that produces or provides the information. Here, it is GitHub’s public Events API.</span></div>
+  <div class="def"><b>Event</b><span>A record describing an activity, such as a push, a repository star, or a fork. It is not the Git repository itself.</span></div>
+  <div class="def"><b>API</b><span>A defined way for one program to request information or actions from another program.</span></div>
+  <div class="def"><b>JSON</b><span>A text format made of named fields, nested objects, and lists. It can represent data with different shapes.</span></div>
+  <div class="def"><b>Database</b><span>A managed place to store and retrieve data. BigQuery is the database/analytics service used here.</span></div>
+  <div class="def"><b>Pipeline</b><span>A sequence of repeatable steps that moves and prepares data.</span></div>
+  <div class="def"><b>ETL / ELT</b><span>ETL transforms before loading; ELT loads first, then transforms in the destination. This project follows ELT.</span></div>
+  <div class="callout good"><b>How to read the guide:</b> follow one example event through each numbered stage. At each stage, ask: what shape is the data, where is it, and what code changes it?</div>
+  <p class="small">The guide describes the checked-in project code. It does not assume access to GitHub’s private internal storage or event-processing systems.</p>
+  <div class="footer"><span>GitHub Telemetry Lakehouse · Brick-by-brick</span><span>Overview</span></div>
+</section>
+
+<section class="page">
+  <div class="topline"><span class="tag">BRICK 1 · THE SOURCE</span></div>
+  <h2>What is stored at the source?</h2>
+  <p>GitHub stores repositories, commits, files, and related information as part of its Git hosting service. This pipeline does not connect to that underlying storage. It requests a separate product interface: the public Events API at <b>/events</b>.</p>
+  <div class="cols">
+    <div class="card blue"><h3>A repository</h3><p>A project hosted on GitHub. Git stores version history as commits and file data. The pipeline does not download this history.</p></div>
+    <div class="card green"><h3>An event</h3><p>A notification-like record that describes a public action associated with a repository. For example: “a push happened.” The event can include a summary of related details.</p></div>
+  </div>
+  <h3>Important distinction</h3>
+  <p>The API response is not a dump of GitHub’s database or a permanent archive. It is a recent feed of public events. This project requests that feed when it runs and saves the returned items. If an event has disappeared from the feed before a run, this code has no way to retrieve it from history.</p>
+  <div class="flow">
+    <div class="node"><strong>Action happens</strong><span>Example: repository receives a push</span></div><div class="arrow">→</div>
+    <div class="node"><strong>GitHub exposes an event</strong><span>Event fields plus action-specific payload</span></div><div class="arrow">→</div>
+    <div class="node"><strong>Our program polls</strong><span>GET request to /events</span></div>
+  </div>
+  <h3>What does one event mean?</h3>
+  <p>An event is a description of an action at a point in time. A <code>PushEvent</code> means a push occurred; a <code>WatchEvent</code> commonly describes a user starring a repository. The event’s <code>type</code> tells us which kind it is. The event’s <code>payload</code> contains details that depend on that type.</p>
+  <table><thead><tr><th>Field idea</th><th>Example meaning</th><th>Why it is useful</th></tr></thead><tbody>
+    <tr><td>Event ID</td><td>Identifier for this event record</td><td>Recognize repeated copies of the same returned event</td></tr>
+    <tr><td>Type</td><td><code>PushEvent</code>, <code>ForkEvent</code>, etc.</td><td>Group or filter actions</td></tr>
+    <tr><td>Actor</td><td>Account associated with the action</td><td>Identify the public account shown in the event</td></tr>
+    <tr><td>Repository</td><td>Repository associated with the action</td><td>Understand which project the event concerns</td></tr>
+    <tr><td>Payload</td><td>Type-specific details</td><td>Preserve the richer event details for later analysis</td></tr>
+  </tbody></table>
+  <div class="callout"><b>Scope check:</b> public event activity is not a complete measure of developer work. Private activity may not be visible, and an event feed is not a guaranteed full-history export.</div>
+  <div class="footer"><span>GitHub Telemetry Lakehouse · Source concepts</span><span>01</span></div>
+</section>
+
+<section class="page">
+  <div class="topline"><span class="tag">BRICK 2 · NESTED JSON</span></div>
+  <h2>How nesting works</h2>
+  <p>JSON can place an object inside another object. This represents a parent-child relationship. A field can contain a simple value, an object with more named fields, or a list of values/objects.</p>
+  <div class="code json">{
+  "id": "987654321",
+  "type": "PushEvent",
+  "created_at": "2026-11-05T09:40:00Z",
+  "actor": { "id": 12345, "login": "sample-user" },
+  "repo": { "id": 67890, "name": "sample-user/demo" },
+  "payload": {
+    "push_id": 456,
+    "commits": [
+      { "sha": "abc123...", "message": "Add report" },
+      { "sha": "def456...", "message": "Fix query" }
+    ]
+  }
+}</div>
+  <div class="cols">
+    <div class="card"><h3>Read a path</h3><div class="tree">actor → login<br>repo → name<br>payload → commits → item 0 → sha</div><p>Dots in a SQL JSON path express nested traversal, such as <code>$.actor.login</code>.</p></div>
+    <div class="card"><h3>Why the payload varies</h3><p>A push may include commit details. A star event may include an action. A fork can include fork information. The same payload columns do not make sense for every event type.</p></div>
+  </div>
+  <h3>Object, array, and value</h3>
+  <table><thead><tr><th>JSON shape</th><th>Example</th><th>Meaning</th></tr></thead><tbody>
+    <tr><td>Object</td><td><code>{"login":"sample-user"}</code></td><td>Named fields grouped together</td></tr>
+    <tr><td>Array</td><td><code>[{"sha":"abc"},{"sha":"def"}]</code></td><td>Ordered list of items; indexes begin at 0 in many programming contexts</td></tr>
+    <tr><td>String</td><td><code>"PushEvent"</code></td><td>Text enclosed in quotation marks</td></tr>
+    <tr><td>Number</td><td><code>12345</code></td><td>Numeric value, not quoted</td></tr>
+  </tbody></table>
+  <h3>Why keep the original nested shape?</h3>
+  <p>If we try to turn every possible payload field into a fixed column at the moment of download, different event types and future field changes make ingestion fragile. This project instead stores the full event as JSON text in Bronze, then extracts a selected set of fields later.</p>
+  <div class="callout good"><b>Think of it like this:</b> the whole JSON object is a parcel. A path such as <code>actor.login</code> is the address for one item inside the parcel. The project stores the parcel first and opens selected parts during modeling.</div>
+  <div class="footer"><span>GitHub Telemetry Lakehouse · JSON concepts</span><span>02</span></div>
+</section>
+
+<section class="page">
+  <div class="topline"><span class="tag">BRICK 3 · REQUEST AND PARSE</span></div>
+  <h2>How Python gets the data</h2>
+  <p>The function <code>fetch_github_events()</code> in <code>ingestion/fetch_and_push_bq.py</code> makes an HTTPS request and converts the response JSON into Python objects.</p>
+  <ol class="steps">
+    <li><b>Prepare headers.</b> The <code>Accept</code> header asks for GitHub’s JSON representation. <code>User-Agent</code> identifies the client program.</li>
+    <li><b>Optionally add a token.</b> If the environment variable <code>GITHUB_TOKEN</code> exists, the code sends it as a Bearer authorization header. Public events can be requested without it.</li>
+    <li><b>Send GET.</b> <code>requests.get(..., timeout=15)</code> asks the server for the endpoint. HTTPS encrypts the network connection. The timeout limits how long this call waits.</li>
+    <li><b>Check the status.</b> A successful response is parsed. For a non-success status, <code>raise_for_status()</code> stops the run with an error instead of pretending data arrived.</li>
+    <li><b>Decode JSON.</b> <code>response.json()</code> turns JSON text from the response into a Python list containing dictionaries.</li>
+  </ol>
+  <div class="code">response = requests.get(GITHUB_API_URL,
+                        headers=headers,
+                        timeout=15)
+response.raise_for_status()
+events = response.json()</div>
+  <div class="cols">
+    <div class="card blue"><h3>HTTP request</h3><p>A message sent from the client (our Python program) to a server. <code>GET</code> means “return the resource.” The response includes a status code, headers, and a body.</p></div>
+    <div class="card green"><h3>Deserialization</h3><p>Turning JSON text into active Python data structures. After parsing, the program can use expressions such as <code>event.get("id")</code>.</p></div>
+  </div>
+  <h3>What is in memory now?</h3>
+  <p>At this point, <code>events</code> is a Python list. Each item is a dictionary representing one event, and nested JSON objects become nested dictionaries/lists. This is temporary process memory; the code has not yet written the batch to a local data file or BigQuery.</p>
+  <div class="callout"><b>Source limit:</b> the endpoint is a recent public feed, not a historical query API. Polling frequency and returned event volume affect what the pipeline sees. Do not infer complete coverage from a successful request.</div>
+  <div class="footer"><span>GitHub Telemetry Lakehouse · Python extraction</span><span>03</span></div>
+</section>
+
+<section class="page">
+  <div class="topline"><span class="tag">BRICK 4 · PACKAGE AND LOAD TO BRONZE</span></div>
+  <h2>From Python objects to BigQuery rows</h2>
+  <p>The function <code>stream_to_bigquery(events)</code> keeps the returned batch in memory, wraps each event in a small database row, then submits the batch as a BigQuery load job.</p>
+  <div class="flow">
+    <div class="node"><strong>Python dictionary</strong><span>Nested event object</span></div><div class="arrow">→</div>
+    <div class="node"><strong>Row envelope</strong><span>ID + type + raw JSON + ingest time</span></div><div class="arrow">→</div>
+    <div class="node"><strong>NDJSON bytes</strong><span>One JSON row per line</span></div><div class="arrow">→</div>
+    <div class="node"><strong>BigQuery load job</strong><span>Append to Bronze table</span></div>
+  </div>
+  <h3>1 · Build the row envelope</h3>
+  <p>For each event, the code reads <code>id</code> and <code>type</code>, serializes the whole original event into <code>raw_payload</code>, and adds one <code>ingested_at</code> time shared by the batch. Events without an ID are skipped.</p>
+  <div class="code">record = {
+  "event_id": str(event.get("id")),
+  "event_type": event.get("type", "Unknown"),
+  "raw_payload": json.dumps(event),
+  "ingested_at": ingested_at,
+}</div>
+  <h3>2 · Make newline-delimited JSON</h3>
+  <p><b>NDJSON</b> means each line is a separate, complete JSON object. BigQuery reads each line as one row. <code>StringIO</code> is a text buffer in RAM. The code rewinds it, obtains the string, encodes it to UTF-8 bytes, and wraps those bytes in <code>BytesIO</code> for the client library.</p>
+  <div class="code">{"event_id":"987654321","event_type":"PushEvent","raw_payload":"{...}","ingested_at":"..."}
+{"event_id":"987654322","event_type":"WatchEvent","raw_payload":"{...}","ingested_at":"..."}</div>
+  <h3>3 · Load to the raw table</h3>
+  <p>The BigQuery client submits a <b>load job</b> to <code>kd-bq-sandbox-2026.github_bronze.raw_events</code>. The schema tells BigQuery the column names and types. <code>WRITE_APPEND</code> means add these rows to existing rows. <code>job.result()</code> waits for completion and raises an error if the job fails.</p>
+  <table><thead><tr><th>Bronze column</th><th>Type</th><th>What is saved</th></tr></thead><tbody>
+    <tr><td><code>event_id</code></td><td>STRING</td><td>Event identifier as text</td></tr>
+    <tr><td><code>event_type</code></td><td>STRING</td><td>For example, PushEvent</td></tr>
+    <tr><td><code>raw_payload</code></td><td>STRING</td><td>The entire original event serialized as JSON text</td></tr>
+    <tr><td><code>ingested_at</code></td><td>TIMESTAMP</td><td>When this pipeline batch was prepared</td></tr>
+  </tbody></table>
+  <div class="callout"><b>Memory detail:</b> this avoids creating a local batch file, but the response, text buffer, and encoded bytes can coexist in RAM briefly. “No local file” does not mean “no memory used.”</div>
+  <div class="footer"><span>GitHub Telemetry Lakehouse · Bronze ingestion</span><span>04</span></div>
+</section>
+
+<section class="page">
+  <div class="topline"><span class="tag">BRICK 5 · STORAGE AND SILVER MODEL</span></div>
+  <h2>What “Bronze” and “Silver” mean here</h2>
+  <p>These are names for data preparation stages. <b>Bronze</b> keeps a close-to-source record. <b>Silver</b> selects, types, and cleans fields into a more convenient shape.</p>
+  <div class="cols">
+    <div class="card amber"><h3>Bronze · raw table</h3><p>A persistent BigQuery table. In this project it is partitioned by the date of <code>ingested_at</code>, and partitions are configured to expire after seven days.</p></div>
+    <div class="card blue"><h3>Silver · view</h3><p>A saved SQL definition, not a separate stored copy of all result rows. When queried, BigQuery runs the SQL against Bronze and returns a shaped result.</p></div>
+  </div>
+  <h3>How the staging SQL shapes data</h3>
+  <ol class="steps">
+    <li>Read Bronze columns: event ID, type, JSON text, and ingest time.</li>
+    <li>Use JSON paths such as <code>$.actor.login</code> and <code>$.repo.name</code> to extract selected nested values.</li>
+    <li>Convert text to typed values: for example, actor ID to an integer and event time to a timestamp.</li>
+    <li>Use <code>ROW_NUMBER()</code> grouped by event ID, keeping the most recently ingested copy when an event appears more than once.</li>
+    <li>Replace missing login/repository names with <code>unknown</code>, and omit rows whose event timestamp could not be parsed.</li>
+  </ol>
+  <div class="code">JSON_VALUE(raw_payload, '$.actor.login') AS actor_login
+SAFE_CAST(JSON_VALUE(raw_payload, '$.actor.id') AS INT64) AS actor_id</div>
+  <h3>What is deduplication?</h3>
+  <p>Deduplication means treating repeated copies of the same event as one logical event. The API may return an event again on a later poll, and a retried load can also append the same rows again. The Silver view chooses one row per <code>event_id</code> for consumers.</p>
+  <div class="callout"><b>Important:</b> the Bronze table remains append-only in this code. Deduplication in a view does not remove duplicate raw rows; it changes what Silver presents.</div>
+  <h3>Why keep the raw payload?</h3>
+  <p>It preserves fields the current model does not use. If the model later needs a new field, it can be extracted from the retained JSON while the Bronze partition still exists.</p>
+  <div class="footer"><span>GitHub Telemetry Lakehouse · Bronze and Silver</span><span>05</span></div>
+</section>
+
+<section class="page">
+  <div class="topline"><span class="tag">BRICK 6 · GOLD AND ANALYTICS</span></div>
+  <h2>How the Gold table is produced</h2>
+  <p>The mart model reads Silver, keeps events from the most recent seven days, and computes columns intended for reporting. In this project the Gold model is materialized as a BigQuery table, so its rows are stored after the dbt run.</p>
+  <table><thead><tr><th>Gold field</th><th>Mechanism</th><th>Example use</th></tr></thead><tbody>
+    <tr><td><code>event_date</code></td><td>Date part of the UTC event timestamp</td><td>Group by day; partition the table</td></tr>
+    <tr><td><code>event_hour_utc</code></td><td>Hour extracted in UTC</td><td>Compare activity by UTC hour</td></tr>
+    <tr><td><code>amer_local_time</code>, etc.</td><td>Convert UTC timestamp to named time zones</td><td>Display a timestamp in a selected region</td></tr>
+    <tr><td><code>is_*_core_hours</code></td><td>Check whether local hour falls in configured range</td><td>Approximate activity during regional office hours</td></tr>
+    <tr><td><code>is_midnight_oil_pushed</code></td><td>Check a late-night hour using the offset in the event timestamp</td><td>Flag a time-of-day pattern for review</td></tr>
+  </tbody></table>
+  <h3>What is a partition? What is clustering?</h3>
+  <div class="cols">
+    <div class="card"><h3>Partition</h3><p>A table is organized into date-based sections. A query limited to a date range can often read fewer sections. Bronze partitions use ingestion date; Gold partitions use event date.</p></div>
+    <div class="card"><h3>Clustering</h3><p>BigQuery organizes data within a table around chosen columns to help some filters run efficiently. Here the model clusters by event type and the late-night flag.</p></div>
+  </div>
+  <div class="callout"><b>Interpretation limit:</b> UTC-to-New-York/London/Singapore conversion tells what the event time is in those time zones. It does not tell the actor’s real location or work schedule. The late-night flag uses the timestamp’s offset; when that timestamp is <code>Z</code> (UTC), the code checks UTC hours. It is a time-based heuristic, not evidence of burnout.</div>
+  <h3>dbt tests</h3>
+  <p><b>dbt</b> is a tool for organizing and running SQL transformations. The project’s YAML files declare checks such as “event ID is not null” and “event ID is unique.” A test is a query that looks for rows violating a rule. It does not automatically correct bad data.</p>
+  <div class="footer"><span>GitHub Telemetry Lakehouse · Gold and data quality</span><span>06</span></div>
+</section>
+
+<section class="page">
+  <div class="topline"><span class="tag">BRICK 7 · RUNNING THE PIPELINE</span></div>
+  <h2>Who starts each step?</h2>
+  <p>The same basic sequence can be started manually or by a scheduler. A scheduler starts a run at a chosen time; it does not change the meaning of the data steps.</p>
+  <div class="flow">
+    <div class="node"><strong>Run setup</strong><span>Optional: create BigQuery datasets/table</span></div><div class="arrow">→</div>
+    <div class="node"><strong>Ingest</strong><span>Python fetches and appends</span></div><div class="arrow">→</div>
+    <div class="node"><strong>dbt run</strong><span>Build Silver view and Gold table</span></div><div class="arrow">→</div>
+    <div class="node"><strong>dbt test</strong><span>Check declared rules</span></div>
+  </div>
+  <table><thead><tr><th>Starter</th><th>What it does in this repo</th></tr></thead><tbody>
+    <tr><td><code>just</code></td><td>Short command names for setup, ingestion, dbt, and the full sequence.</td></tr>
+    <tr><td><code>scripts/run_pipeline.py</code></td><td>Runs ingestion, then dbt run, then dbt test as subprocesses; stops if a command fails.</td></tr>
+    <tr><td>GitHub Actions</td><td>Runs from a hosted GitHub runner on a schedule, on push to main, or manually. It authenticates to Google Cloud before running.</td></tr>
+    <tr><td>Airflow</td><td>Defines a 15-minute DAG with ingestion → dbt run → dbt test. Its current Compose paths need adjustment to match the container mounts.</td></tr>
+  </tbody></table>
+  <h3>Credentials: what needs access?</h3>
+  <ul>
+    <li><b>GitHub API:</b> public events can be fetched without a token; <code>GITHUB_TOKEN</code> is optional.</li>
+    <li><b>BigQuery:</b> a Google identity is required to create query/load jobs and access the project datasets. Local runs use Application Default Credentials (ADC); CI currently expects a <code>GCP_SA_KEY</code> secret.</li>
+    <li><b>Safer CI setup:</b> replace a long-lived service-account key with GitHub OIDC and Google Workload Identity Federation where configured.</li>
+  </ul>
+  <h3>A few practical limits to remember</h3>
+  <div class="def"><b>Coverage</b><span>Recent feed polling can miss events; it is not a complete archive.</span></div>
+  <div class="def"><b>Duplicates</b><span>Raw appends may repeat events; Silver deduplicates query results by ID.</span></div>
+  <div class="def"><b>Cost</b><span>Free-tier quotas and limits apply; “zero cost” depends on remaining within them.</span></div>
+  <div class="def"><b>Personal meaning</b><span>Public account activity and event times do not prove an individual’s location, work hours, or wellbeing.</span></div>
+  <div class="callout good"><b>One-sentence recap:</b> Python retrieves recent event JSON; Bronze stores each whole event inside a row; dbt extracts selected nested fields and builds a reporting table; tests check whether the modeled data follows declared rules.</div>
+  <div class="footer"><span>GitHub Telemetry Lakehouse · Orchestration and recap</span><span>07</span></div>
+</section>
+
+</body>
+</html>

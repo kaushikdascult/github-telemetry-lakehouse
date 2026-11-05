@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GitHub Telemetry Ingestion: Architecture & Mechanics</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm 12mm 15mm;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #1e293b;
+    background-color: #ffffff;
+    font-size: 8.5pt;
+    line-height: 1.52;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  /* Header Banner */
+  .header {
+    border-bottom: 1.2px solid #0f172a;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+  }
+
+  .badge-tag {
+    display: inline-block;
+    font-size: 6.6pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #2563eb;
+    background: #f0f4ff;
+    padding: 2.5px 7px;
+    border-radius: 3px;
+    border: 0.8px solid #c7d7fe;
+    margin-bottom: 5px;
+  }
+
+  h1 {
+    font-size: 16pt;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+    line-height: 1.22;
+    margin-bottom: 3px;
+  }
+
+  .subtitle {
+    font-size: 8.2pt;
+    color: #475569;
+    line-height: 1.35;
+  }
+
+  .meta-row {
+    margin-top: 6px;
+    display: flex;
+    gap: 14px;
+    font-size: 7.2pt;
+    color: #64748b;
+  }
+
+  .meta-item strong {
+    color: #334155;
+  }
+
+  /* Section Titles */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    padding-bottom: 3px;
+    border-bottom: 0.8px solid #e2e8f0;
+  }
+
+  .section-num {
+    font-size: 6.8pt;
+    font-weight: 700;
+    color: #ffffff;
+    background: #1e293b;
+    padding: 1px 5px;
+    border-radius: 2px;
+    letter-spacing: 0.04em;
+  }
+
+  h2 {
+    font-size: 10.8pt;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #0f172a;
+  }
+
+  p {
+    margin-bottom: 6px;
+    color: #334155;
+    font-size: 8.2pt;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6px 0 10px 0;
+    font-size: 7.6pt;
+  }
+
+  th {
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-weight: 600;
+    text-align: left;
+    padding: 4.5px 7px;
+    border: 0.8px solid #cbd5e1;
+    font-size: 7.2pt;
+    letter-spacing: 0.02em;
+  }
+
+  td {
+    padding: 4.5px 7px;
+    border: 0.8px solid #e2e8f0;
+    vertical-align: top;
+    color: #334155;
+  }
+
+  tr:nth-child(even) td {
+    background-color: #fafafc;
+  }
+
+  .pill {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 6.8pt;
+    font-weight: 600;
+  }
+
+  .pill-blue { background: #f0f4ff; color: #1e40af; border: 0.6px solid #c7d7fe; }
+  .pill-green { background: #f0fdf9; color: #065f46; border: 0.6px solid #bbf7d0; }
+  .pill-amber { background: #fffdf0; color: #92400e; border: 0.6px solid #fef08a; }
+  .pill-slate { background: #f1f5f9; color: #334155; border: 0.6px solid #cbd5e1; }
+
+  /* Flowchart / Box Cards */
+  .diagram-container {
+    background: #ffffff;
+    border: 0.8px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 8px;
+    margin: 8px 0 10px 0;
+  }
+
+  svg text {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  /* Code Blocks */
+  .code-block {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 4px;
+    padding: 7px 9px;
+    font-family: "JetBrains Mono", Menlo, Consolas, Monaco, monospace;
+    font-size: 7pt;
+    line-height: 1.42;
+    margin: 6px 0 8px 0;
+    overflow-x: hidden;
+    white-space: pre;
+    border: 0.8px solid #1e293b;
+  }
+
+  .code-comment { color: #64748b; }
+  .code-keyword { color: #93c5fd; font-weight: 600; }
+  .code-func { color: #fde047; }
+  .code-string { color: #86efac; }
+  .code-var { color: #f1f5f9; }
+
+  /* Grid Layouts */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 6px 0;
+  }
+
+  .card {
+    background: #ffffff;
+    border: 0.8px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 7px 9px;
+  }
+
+  .card-header {
+    font-size: 7.9pt;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .card p {
+    font-size: 7.4pt;
+    line-height: 1.4;
+    color: #475569;
+    margin-bottom: 0;
+  }
+
+  /* Callout Box */
+  .callout {
+    background: #f8fafc;
+    border-left: 2.5px solid #2563eb;
+    padding: 5px 8px;
+    margin: 7px 0;
+    border-radius: 0 3px 3px 0;
+    font-size: 7.5pt;
+  }
+
+  .callout-title {
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 2px;
+  }
+
+  .footer {
+    margin-top: 10px;
+    padding-top: 4px;
+    border-top: 0.8px solid #cbd5e1;
+    display: flex;
+    justify-content: space-between;
+    font-size: 6.6pt;
+    color: #94a3b8;
+  }
+</style>
+</head>
+<body>
+
+  <!-- ==================== PAGE 1 ==================== -->
+  <div class="header">
+    <span class="badge-tag">DATA LAKEHOUSE ENGINEERING • PRODUCTION DEEP DIVE</span>
+    <h1>GitHub Telemetry Ingestion Architecture</h1>
+    <div class="subtitle">
+      A First-Principles Guide to Event Streams, Hierarchical JSON Nesting, Zero-Disk In-Memory Buffers, and BigQuery Batch Semantics.
+    </div>
+    <div class="meta-row">
+      <div class="meta-item"><strong>Target Architecture:</strong> Medallion Lakehouse</div>
+      <div class="meta-item"><strong>Storage Engine:</strong> Google BigQuery Sandbox</div>
+      <div class="meta-item"><strong>Transformation:</strong> dbt Core 1.11</div>
+      <div class="meta-item"><strong>Language:</strong> Python 3.12</div>
+    </div>
+  </div>
+
+  <!-- BRICK 1 -->
+  <div class="avoid-break">
+    <div class="section-header">
+      <span class="section-num">BRICK 1</span>
+      <h2>Core Terminology & Foundational Definitions</h2>
+    </div>
+    <p>Operational clarity in distributed data systems requires unambiguous definitions. Below is the foundational vocabulary governing this pipeline:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 17%;">Technical Term</th>
+          <th style="width: 48%;">Engineering Definition</th>
+          <th style="width: 35%;">Applied Architectural Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Event</strong></td>
+          <td>An immutable record representing a discrete state change at a specific UTC timestamp. It can only be created—never updated or mutated at source.</td>
+          <td>A git commit push or pull request creation emitted once into the stream.</td>
+        </tr>
+        <tr>
+          <td><strong>Telemetry</strong></td>
+          <td>The automated collection and transmission of operational developer activity metrics from remote endpoints for centralized velocity analytics.</td>
+          <td>Streaming global commit and review timestamps into an analytical warehouse.</td>
+        </tr>
+        <tr>
+          <td><strong>REST API</strong></td>
+          <td>Stateless client-server architecture using standard HTTP request verbs (GET) and structured payloads (JSON) over TLS.</td>
+          <td>Requesting micro-batches of public events from <code>api.github.com/events</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>JSON Nesting</strong></td>
+          <td>Hierarchical parent-child object structures inside a single document (e.g., <code>actor.login</code> or <code>payload.commits[]</code>).</td>
+          <td>Enables multi-dimensional entity payloads within a single record envelope.</td>
+        </tr>
+        <tr>
+          <td><strong>Serialization</strong></td>
+          <td>Translating in-memory application runtime objects (Python dictionaries) into structured byte/text representations (NDJSON).</td>
+          <td>Formatting Python objects into raw newline-separated JSON text strings.</td>
+        </tr>
+        <tr>
+          <td><strong>Deserialization</strong></td>
+          <td>Parsing external byte or text streams into strongly or dynamically typed objects inside active heap memory.</td>
+          <td><code>response.json()</code> parsing raw HTTP responses into Python dictionary trees.</td>
+        </tr>
+        <tr>
+          <td><strong>In-Memory Buffer</strong></td>
+          <td>Allocating process RAM (<code>io.StringIO</code>) as an ephemeral file descriptor to bypass host disk writes completely.</td>
+          <td>Preserves NVMe SSD lifespan and eliminates temporary file leakage in CI runners.</td>
+        </tr>
+        <tr>
+          <td><strong>NDJSON</strong></td>
+          <td>Newline-Delimited JSON: Individual valid JSON records separated by standard <code>\n</code> characters. Ideal for parallel columnar load jobs.</td>
+          <td>BigQuery’s native bulk ingestion format for semi-structured records.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- BRICK 2 -->
+  <div class="avoid-break" style="margin-top: 8px;">
+    <div class="section-header">
+      <span class="section-num">BRICK 2</span>
+      <h2>Source Architecture: How Data Exists Inside GitHub</h2>
+    </div>
+    <p>When an engineer interacts with GitHub, an internal event stream moves through multiple platform tiers before reaching public visibility:</p>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 760 90" width="100%" height="90" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-reverse">
+            <path d="M 0 2 L 7 5 L 0 8 z" fill="#64748b"/>
+          </marker>
+        </defs>
+
+        <!-- Node 1 -->
+        <rect x="5" y="15" width="135" height="60" rx="3" fill="#ffffff" stroke="#94a3b8" stroke-width="0.9"/>
+        <text x="72" y="40" font-size="8.2" font-weight="600" fill="#0f172a" text-anchor="middle">Engineer Action</text>
+        <text x="72" y="54" font-size="7" fill="#64748b" text-anchor="middle">git push / PR / Star</text>
+
+        <line x1="140" y1="45" x2="175" y2="45" stroke="#94a3b8" stroke-width="0.9" marker-end="url(#arrow)"/>
+
+        <!-- Node 2 -->
+        <rect x="180" y="15" width="165" height="60" rx="3" fill="#f8fafc" stroke="#cbd5e1" stroke-width="0.9"/>
+        <text x="262" y="38" font-size="8.2" font-weight="600" fill="#0f172a" text-anchor="middle">Internal Event Bus</text>
+        <text x="262" y="51" font-size="7" fill="#475569" text-anchor="middle">Kafka + Git Object Store</text>
+        <text x="262" y="63" font-size="6.5" fill="#64748b" text-anchor="middle">(Immutable State Capture)</text>
+
+        <line x1="345" y1="45" x2="380" y2="45" stroke="#94a3b8" stroke-width="0.9" marker-end="url(#arrow)"/>
+
+        <!-- Node 3 -->
+        <rect x="385" y="15" width="170" height="60" rx="3" fill="#f0f4ff" stroke="#c7d7fe" stroke-width="0.9"/>
+        <text x="470" y="38" font-size="8.2" font-weight="600" fill="#1e40af" text-anchor="middle">Public REST Gateway</text>
+        <text x="470" y="51" font-size="7" fill="#2563eb" text-anchor="middle">api.github.com/events</text>
+        <text x="470" y="63" font-size="6.5" fill="#3b82f6" text-anchor="middle">HTTP/2 TLS • 30 events/page</text>
+
+        <line x1="555" y1="45" x2="590" y2="45" stroke="#94a3b8" stroke-width="0.9" marker-end="url(#arrow)"/>
+
+        <!-- Node 4 -->
+        <rect x="595" y="15" width="160" height="60" rx="3" fill="#fffdf0" stroke="#fef08a" stroke-width="0.9"/>
+        <text x="675" y="38" font-size="8.2" font-weight="600" fill="#92400e" text-anchor="middle">Rolling Event Buffer</text>
+        <text x="675" y="51" font-size="7" fill="#b45309" text-anchor="middle">~300 Global Events</text>
+        <text x="675" y="63" font-size="6.5" fill="#d97706" text-anchor="middle">(15–30 Minute Window)</text>
+      </svg>
+    </div>
+
+    <div class="callout">
+      <div class="callout-title">Architectural Constraint — The Rolling Buffer Rule:</div>
+      The GitHub public <code>/events</code> endpoint does not support historical date-range querying. It acts as an ephemeral sliding window of the last ~300 global events. Continuous micro-batching is therefore mandatory to capture and persist telemetry records before they age out.
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>GitHub Telemetry Lakehouse • Architectural Reference</span>
+    <span>Page 1 of 3</span>
+  </div>
+
+  <!-- ==================== PAGE 2 ==================== -->
+  <div class="page-break"></div>
+
+  <div class="header">
+    <span class="badge-tag">DATA MODELING & INGESTION MECHANICS</span>
+    <h1>Semi-Structured Nesting & Network Protocol</h1>
+    <div class="subtitle">Managing Schema Evolution in Cloud-Native ELT Pipelines</div>
+  </div>
+
+  <!-- BRICK 3 -->
+  <div class="avoid-break">
+    <div class="section-header">
+      <span class="section-num">BRICK 3</span>
+      <h2>How Hierarchical JSON Nesting Works</h2>
+    </div>
+    <p>Unlike relational 2D tables with static schemas, event telemetry features variable child structures and dynamic lists:</p>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header">
+          <span>Source Event Payload</span>
+          <span class="pill pill-blue">Hierarchical JSON</span>
+        </div>
+        <div class="code-block" style="margin: 0;">
+{
+  <span class="code-keyword">"id"</span>: <span class="code-string">"43512345678"</span>,
+  <span class="code-keyword">"type"</span>: <span class="code-string">"PushEvent"</span>,
+  <span class="code-keyword">"actor"</span>: {               <span class="code-comment">&lt;-- Nested Object</span>
+    <span class="code-keyword">"id"</span>: <span class="code-var">123456</span>,
+    <span class="code-keyword">"login"</span>: <span class="code-string">"octocat"</span>
+  },
+  <span class="code-keyword">"repo"</span>: {                <span class="code-comment">&lt;-- Nested Object</span>
+    <span class="code-keyword">"id"</span>: <span class="code-var">987654</span>,
+    <span class="code-keyword">"name"</span>: <span class="code-string">"org/repo"</span>
+  },
+  <span class="code-keyword">"payload"</span>: {             <span class="code-comment">&lt;-- Polymorphic Sub-tree</span>
+    <span class="code-keyword">"commits"</span>: [           <span class="code-comment">&lt;-- Dynamic Array</span>
+      { <span class="code-keyword">"sha"</span>: <span class="code-string">"6dcb09..."</span> }
+    ]
+  }
+}</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span>BigQuery Bronze Storage Layer</span>
+          <span class="pill pill-green">Document-Relational Pattern</span>
+        </div>
+        <p style="margin-bottom: 5px;">Unnesting all columns at ingestion creates brittle pipelines. Instead, we persist the complete payload in Bronze and project attributes downstream in dbt:</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Field Name</th>
+              <th>Data Type</th>
+              <th>Architectural Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>event_id</code></td>
+              <td><code>STRING</code></td>
+              <td>Deduplication Key (Source ID)</td>
+            </tr>
+            <tr>
+              <td><code>event_type</code></td>
+              <td><code>STRING</code></td>
+              <td>Physical Clustering Attribute</td>
+            </tr>
+            <tr>
+              <td><code>raw_payload</code></td>
+              <td><code>STRING</code></td>
+              <td>Lossless serialized JSON tree</td>
+            </tr>
+            <tr>
+              <td><code>ingested_at</code></td>
+              <td><code>TIMESTAMP</code></td>
+              <td>Daily Partition Key with 7d TTL</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="font-size: 7.1pt; color: #64748b; margin-top: 4px;">
+          <em>Downstream Projection:</em> dbt extracts child fields dynamically using SQL path syntax: <code>JSON_VALUE(raw_payload, '$.actor.login')</code>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- BRICK 4 -->
+  <div class="avoid-break" style="margin-top: 10px;">
+    <div class="section-header">
+      <span class="section-num">BRICK 4</span>
+      <h2>Network Protocol & API Transport Mechanics</h2>
+    </div>
+    <p>The ingestion worker client executes a resilient HTTP GET negotiation with GitHub’s edge routers:</p>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header">
+          <span>Worker Extraction Function</span>
+          <span class="pill pill-slate">Python 3.12</span>
+        </div>
+        <div class="code-block" style="margin: 0;">
+<span class="code-keyword">def</span> <span class="code-func">fetch_github_events</span>() -&gt; <span class="code-keyword">list</span>:
+    headers = {
+        <span class="code-string">"Accept"</span>: <span class="code-string">"application/vnd.github+json"</span>,
+        <span class="code-string">"User-Agent"</span>: <span class="code-string">"Telemetry-Pipeline/1.0"</span>,
+    }
+    token = os.getenv(<span class="code-string">"GITHUB_TOKEN"</span>)
+    <span class="code-keyword">if</span> token:
+        headers[<span class="code-string">"Authorization"</span>] = <span class="code-string">f"Bearer {token}"</span>
+
+    response = requests.get(
+        <span class="code-string">"https://api.github.com/events"</span>,
+        headers=headers,
+        timeout=15,  <span class="code-comment"># Socket hang prevention</span>
+    )
+    response.raise_for_status()
+    <span class="code-keyword">return</span> response.json()  <span class="code-comment"># Deserializes to RAM</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span>Transport & Security Specification</span>
+          <span class="pill pill-amber">Networking</span>
+        </div>
+        <table style="margin: 0;">
+          <thead>
+            <tr>
+              <th>Dimension</th>
+              <th>Anonymous Mode</th>
+              <th>Authenticated Token</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Rate Ceiling</strong></td>
+              <td>60 requests / hour</td>
+              <td><strong>5,000 requests / hour</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Auth Overhead</strong></td>
+              <td>None</td>
+              <td>Bearer token via env var</td>
+            </tr>
+            <tr>
+              <td><strong>Socket Guard</strong></td>
+              <td colspan="2">15-second strict timeout prevents hanging jobs</td>
+            </tr>
+            <tr>
+              <td><strong>Transport</strong></td>
+              <td colspan="2">TLS 1.3 encryption over TCP port 443</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>GitHub Telemetry Lakehouse • Architectural Reference</span>
+    <span>Page 2 of 3</span>
+  </div>
+
+  <!-- ==================== PAGE 3 ==================== -->
+  <div class="page-break"></div>
+
+  <div class="header">
+    <span class="badge-tag">STREAMING INGESTION SEAM</span>
+    <h1>In-Memory Zero-Disk Loading & BigQuery Semantics</h1>
+    <div class="subtitle">Direct-to-Cloud RAM Buffering: Eliminating Local Storage Latency and Cloud Egress Costs</div>
+  </div>
+
+  <!-- BRICK 5 -->
+  <div class="avoid-break">
+    <div class="section-header">
+      <span class="section-num">BRICK 5</span>
+      <h2>The In-Memory Zero-Disk Seam: <code>stream_to_bigquery()</code></h2>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 760 85" width="100%" height="85" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow2" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-reverse">
+            <path d="M 0 2 L 7 5 L 0 8 z" fill="#64748b"/>
+          </marker>
+        </defs>
+
+        <!-- Node 1 -->
+        <rect x="5" y="15" width="155" height="55" rx="3" fill="#f8fafc" stroke="#cbd5e1" stroke-width="0.9"/>
+        <text x="82" y="37" font-size="8.2" font-weight="600" fill="#0f172a" text-anchor="middle">1. Python Dict in RAM</text>
+        <text x="82" y="51" font-size="7" fill="#64748b" text-anchor="middle">response.json() memory list</text>
+
+        <line x1="160" y1="42" x2="195" y2="42" stroke="#94a3b8" stroke-width="0.9" marker-end="url(#arrow2)"/>
+
+        <!-- Node 2 -->
+        <rect x="200" y="15" width="165" height="55" rx="3" fill="#f0f4ff" stroke="#c7d7fe" stroke-width="0.9"/>
+        <text x="282" y="37" font-size="8.2" font-weight="600" fill="#1e40af" text-anchor="middle">2. io.StringIO() Buffer</text>
+        <text x="282" y="51" font-size="7" fill="#2563eb" text-anchor="middle">In-Memory NDJSON strings</text>
+
+        <line x1="365" y1="42" x2="400" y2="42" stroke="#94a3b8" stroke-width="0.9" marker-end="url(#arrow2)"/>
+
+        <!-- Node 3 -->
+        <rect x="405" y="15" width="165" height="55" rx="3" fill="#fffdf0" stroke="#fef08a" stroke-width="0.9"/>
+        <text x="487" y="37" font-size="8.2" font-weight="600" fill="#92400e" text-anchor="middle">3. io.BytesIO() Stream</text>
+        <text x="487" y="51" font-size="7" fill="#b45309" text-anchor="middle">buffer.seek(0) + utf-8 bytes</text>
+
+        <line x1="570" y1="42" x2="605" y2="42" stroke="#94a3b8" stroke-width="0.9" marker-end="url(#arrow2)"/>
+
+        <!-- Node 4 -->
+        <rect x="610" y="15" width="145" height="55" rx="3" fill="#f0fdf9" stroke="#bbf7d0" stroke-width="0.9"/>
+        <text x="682" y="37" font-size="8.2" font-weight="600" fill="#065f46" text-anchor="middle">4. BigQuery Bronze</text>
+        <text x="682" y="51" font-size="7" fill="#047857" text-anchor="middle">Free LoadJob + Daily TTL</text>
+      </svg>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header">
+          <span>In-Memory Formatting & Dispatch</span>
+          <span class="pill pill-blue">Zero Local Disk</span>
+        </div>
+        <div class="code-block" style="margin: 0;">
+<span class="code-comment"># Allocate memory stream (No disk writes)</span>
+buffer = io.StringIO()
+<span class="code-keyword">for</span> event <span class="code-keyword">in</span> events:
+    record = {
+        <span class="code-string">"event_id"</span>: str(event[<span class="code-string">"id"</span>]),
+        <span class="code-string">"event_type"</span>: event.get(<span class="code-string">"type"</span>),
+        <span class="code-string">"raw_payload"</span>: json.dumps(event),
+        <span class="code-string">"ingested_at"</span>: datetime.now(timezone.utc).isoformat(),
+    }
+    buffer.write(json.dumps(record) + <span class="code-string">"\n"</span>)
+
+buffer.seek(0)
+bytes_data = buffer.getvalue().encode(<span class="code-string">"utf-8"</span>)
+
+<span class="code-comment"># Batch load job (100% Free of charge)</span>
+job = client.load_table_from_file(
+    io.BytesIO(bytes_data),
+    <span class="code-string">"kd-bq-sandbox-2026.github_bronze.raw_events"</span>,
+    job_config=job_config,
+)
+job.result()  <span class="code-comment"># Blocks until committed</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span>Engineering Trade-Off Analysis</span>
+          <span class="pill pill-green">Production Best Practices</span>
+        </div>
+        <p style="font-size: 7.5pt; margin-bottom: 5px;"><strong>1. Batch Load Job vs. Streaming Inserts:</strong></p>
+        <ul style="font-size: 7.2pt; color: #475569; padding-left: 12px; margin-bottom: 7px;">
+          <li><code>insert_rows_json()</code> costs $0.01 per 200 MB and has strict rate-limiting inside Google BigQuery Sandbox.</li>
+          <li><code>load_table_from_file()</code> is <strong>100% free ($0.00)</strong> and creates an atomic partition write.</li>
+        </ul>
+
+        <p style="font-size: 7.5pt; margin-bottom: 5px;"><strong>2. Why Zero-Disk Matters:</strong></p>
+        <ul style="font-size: 7.2pt; color: #475569; padding-left: 12px; margin-bottom: 7px;">
+          <li>Eliminates ephemeral disk leakage and permissions failures in GitHub Actions runners & Docker containers.</li>
+          <li>Zero SSD write wear preserves hardware lifespan.</li>
+        </ul>
+
+        <p style="font-size: 7.5pt; margin-bottom: 5px;"><strong>3. Atomic Commit Guarantee:</strong></p>
+        <ul style="font-size: 7.2pt; color: #475569; padding-left: 12px;">
+          <li>Either all rows in the micro-batch land successfully, or the entire job aborts cleanly without partial corruptions.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Architecture Summary Takeaway Card for LinkedIn Carousel -->
+  <div class="avoid-break" style="margin-top: 10px;">
+    <div class="card" style="background: #f8fafc; border: 0.8px solid #cbd5e1; padding: 8px 12px;">
+      <div class="card-header" style="margin-bottom: 6px;">
+        <span style="font-size: 8.5pt; color: #0f172a;">Executive Architecture Takeaways: The 4 Tenets</span>
+        <span class="pill pill-slate">Summary</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; font-size: 7.1pt;">
+        <div>
+          <strong style="color: #1e40af;">1. Ephemeral Ingestion</strong><br/>
+          Direct API-to-RAM buffers prevent local storage exhaustion.
+        </div>
+        <div>
+          <strong style="color: #065f46;">2. Document Pattern</strong><br/>
+          Raw JSON strings guarantee immunity against upstream schema drift.
+        </div>
+        <div>
+          <strong style="color: #92400e;">3. Zero-Cost Batch</strong><br/>
+          BigQuery Load Jobs preserve $0.00 cloud operational spend.
+        </div>
+        <div>
+          <strong style="color: #334155;">4. Partition Pruning</strong><br/>
+          7-day rolling TTL keeps queries within monthly free-tier quotas.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer" style="margin-top: 14px;">
+    <span>GitHub Telemetry Lakehouse • Architectural Reference</span>
+    <span>Page 3 of 3</span>
+  </div>
+
+</body>
+</html>

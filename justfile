@@ -30,4 +30,4 @@ run:
 
 # Inspect top 10 recent records in BigQuery Gold Mart
 query:
-    {{ PYTHON }} -c "from google.cloud import bigquery; client = bigquery.Client(project='kd-bq-sandbox-2026'); print(client.query('SELECT event_id, event_type, actor_login, amer_local_time, is_midnight_oil_pushed FROM kd-bq-sandbox-2026.github_marts.fct_global_developer_activity ORDER BY created_at_utc DESC LIMIT 10').to_dataframe().to_string())"
+    {{ PYTHON }} -c "from google.cloud import bigquery; client = bigquery.Client(project='kd-bq-sandbox-2026'); print(client.query('SELECT event_id, event_type, actor_login, amer_local_time, is_off_peak_activity FROM kd-bq-sandbox-2026.github_marts.fct_global_developer_activity ORDER BY created_at_utc DESC LIMIT 10').to_dataframe().to_string())"

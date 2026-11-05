@@ -78,22 +78,22 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | **Bronze (Raw)** | `github_bronze.raw_events` | Partitioned Table | 1 row per raw API event. Daily partitioned on `ingested_at` with a 7-day automatic partition TTL. |
 | **Silver (Staged)** | `github_silver.stg_github_events` | View | 1 row per unique `event_id`. Unpacks nested JSON with `JSON_VALUE`, normalizes to UTC, deduplicates via window functions. |
-| **Gold (Mart)** | `github_marts.fct_global_developer_activity` | Partitioned & Clustered Table | 1 row per developer action. Daily partitioned on `event_date`, clustered by `event_type` and `is_midnight_oil_pushed`. Projects into AMER, EMEA, APAC, and IST regional local times. |
+| **Gold (Mart)** | `github_marts.fct_global_developer_activity` | Partitioned & Clustered Table | 1 row per developer action. Daily partitioned on `event_date`, clustered by `event_type` and `is_off_peak_activity`. Projects into AMER, EMEA, APAC, and IST regional local times. |
 
 ---
 
 ## 5. Sample Analytical Queries
 
-### A. The "Midnight Oil" Burnout Query
+### A. The Off-Peak Developer Activity Query
 ```sql
 SELECT 
     actor_login,
     repo_name,
     created_at_utc,
     amer_local_time,
-    is_midnight_oil_pushed
+    is_off_peak_activity
 FROM `kd-bq-sandbox-2026.github_marts.fct_global_developer_activity`
-WHERE is_midnight_oil_pushed = TRUE
+WHERE is_off_peak_activity = TRUE
 ORDER BY created_at_utc DESC
 LIMIT 10;
 ```
@@ -152,6 +152,6 @@ just query
 3. Select Project: `kd-bq-sandbox-2026` $\to$ Dataset: `github_marts` $\to$ Table: `fct_global_developer_activity`.
 4. Recommended Charts:
    * **Scorecard**: Total Events Processed.
-   * **Pie Chart / Donut**: Breakdown of `is_midnight_oil_pushed` (True vs False).
+   * **Pie Chart / Donut**: Breakdown of `is_off_peak_activity` (True vs False).
    * **Time-Series Chart**: Dimension: `amer_local_time` (by hour), Metric: Count of Events.
    * **Table**: Top repositories with out-of-hours contributions.

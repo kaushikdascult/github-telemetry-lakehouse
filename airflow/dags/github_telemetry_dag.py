@@ -8,13 +8,18 @@ import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
 
-# Default paths
-AIRFLOW_HOME = os.getenv("AIRFLOW_HOME", "/opt/airflow")
-PROJECT_DIR = os.getenv("PROJECT_DIR", "/home/datadask/MyProject/github-telemetry-lakehouse")
-VENV_PYTHON = os.getenv("VENV_PYTHON", "/home/datadask/my_python312_env/bin/python")
-VENV_DBT = os.getenv("VENV_DBT", "/home/datadask/my_python312_env/bin/dbt")
+# Environment detection: auto-resolve container mounts vs host workspace
+IN_CONTAINER = os.path.exists("/opt/airflow/ingestion")
+
+if IN_CONTAINER:
+    PROJECT_DIR = "/opt/airflow"
+    VENV_PYTHON = os.getenv("VENV_PYTHON", "python3")
+    VENV_DBT = os.getenv("VENV_DBT", "dbt")
+else:
+    PROJECT_DIR = os.getenv("PROJECT_DIR", "/home/datadask/MyProject/github-telemetry-lakehouse")
+    VENV_PYTHON = os.getenv("VENV_PYTHON", "/home/datadask/my_python312_env/bin/python")
+    VENV_DBT = os.getenv("VENV_DBT", "/home/datadask/my_python312_env/bin/dbt")
 
 default_args = {
     "owner": "data_engineering",
